@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Self
 
 from modules.metrics import *
 from modules.utils import z_normalize
