@@ -3,7 +3,7 @@ import pandas as pd
 import math
 import cv2
 import imutils
-
+import matplotlib.pyplot as plt
 
 class Image2TimeSeries:
     """
@@ -31,7 +31,17 @@ class Image2TimeSeries:
         prep_img: image after preprocessing
         """
 
-        # INSERT YOUR CODE
+        # 1. Grayscale
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # 2. Inverse (объект становится светлым)
+        inv = cv2.bitwise_not(gray)
+
+        # 3. Slight blur
+        blur = cv2.GaussianBlur(inv, (5, 5), 0)
+
+        # 4. Threshold (бинаризация: пиксели > 60 -> 255, иначе 0)
+        _, prep_img = cv2.threshold(blur, 60, 255, cv2.THRESH_BINARY)
 
         return prep_img
 

@@ -64,9 +64,25 @@ class TimeSeriesKNN:
         dist: distance between the train and test samples
         """
 
-        dist = 0
+        if self.metric == 'euclidean':
+            normalize = self.metric_params.get('normalize', False)
+            if normalize:
+                dist = norm_ED_distance(x_train, x_test)
+            else:
+                dist = ED_distance(x_train, x_test)
 
-        # INSERT YOUR CODE
+        elif self.metric == 'dtw':
+            normalize = self.metric_params.get('normalize', False)
+
+            if normalize:
+                x_train_n = z_normalize(x_train)
+                x_test_n = z_normalize(x_test)
+                dist = DTW_distance(x_train_n, x_test_n)
+            else:
+                dist = DTW_distance(x_train, x_test)
+
+        else:
+            raise ValueError(f"Unknown metric: {self.metric}")
 
         return dist
 
@@ -86,7 +102,12 @@ class TimeSeriesKNN:
 
         neighbors = []
 
-        # INSERT YOUR CODE
+        for i in range(self.X_train.shape[0]):
+            dist = self._distance(self.X_train[i], x_test)
+            neighbors.append((dist, self.Y_train[i]))
+
+        neighbors.sort(key=lambda x: x[0])
+        neighbors = neighbors[:self.n_neighbors]
 
         return neighbors
 
@@ -106,7 +127,13 @@ class TimeSeriesKNN:
 
         y_pred = []
 
-        # INSERT YOUR CODE
+        for x_test in X_test:
+            neighbors = self._find_neighbors(x_test)
+            labels = [label for _, label in neighbors]
+
+            # Самый частый класс среди соседей
+            values, counts = np.unique(labels, return_counts=True)
+            y_pred.append(values[np.argmax(counts)])
 
         return np.array(y_pred)
 
