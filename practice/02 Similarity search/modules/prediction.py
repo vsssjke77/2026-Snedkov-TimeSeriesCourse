@@ -84,6 +84,66 @@ class BestMatchPredictor:
 
         predict_values = np.zeros((self.h,))
 
-        # INSERT YOUR CODE
-        
+        m = len(query)
+
+        # Чтобы после каждой найденной подпоследовательности
+        # существовали h будущих значений
+        search_ts = ts[:-self.h]
+
+        if self.match_alg == 'UCR-DTW':
+
+            finder = UCR_DTW(
+                excl_zone_frac=self.match_alg_params['excl_zone_frac'],
+                topK=self.match_alg_params['topK'],
+                is_normalize=self.match_alg_params['is_normalize'],
+                r=self.match_alg_params['r']
+            )
+
+            bestmatch = finder.perform(
+                search_ts,
+                query
+            )
+
+            indices = bestmatch['indices']
+
+        elif self.match_alg == 'MASS':
+
+            dist_profile = np.real(
+                mts.mass(search_ts, query)
+            )
+
+            excl_zone = math.ceil(
+                m * self.match_alg_params['excl_zone_frac']
+            )
+
+            bestmatch = topK_match(
+                dist_profile,
+                excl_zone,
+                self.match_alg_params['topK']
+            )
+
+            indices = bestmatch['indices']
+
+        else:
+            raise NotImplementedError
+
+        # Получаем h значений после каждой найденной подпоследовательности
+        topK_subs_predict_values = []
+
+        for idx in indices:
+            future_values = search_ts[
+                idx + m: idx + m + self.h
+            ]
+
+            if len(future_values) == self.h:
+                topK_subs_predict_values.append(future_values)
+
+        topK_subs_predict_values = np.array(
+            topK_subs_predict_values
+        )
+
+        predict_values = self._calculate_predict_values(
+            topK_subs_predict_values
+        )
+
         return predict_values

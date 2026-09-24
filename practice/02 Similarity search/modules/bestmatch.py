@@ -150,11 +150,30 @@ class NaiveBestMatchFinder(BestMatchFinder):
         bsf = np.inf
 
         bestmatch = {
-            'index' : [],
-            'distance' : []
+            'indices': [],
+            'distances': []
         }
-        
-        # INSERT YOUR CODE
+
+        # Основной цикл
+        for i in range(N):
+            subseq = ts_data[i]
+
+            if self.is_normalize:
+                subseq_n = z_normalize(subseq)
+                query_n = z_normalize(query)
+                dist = DTW_distance(subseq_n, query_n, self.r)
+            else:
+                dist = DTW_distance(subseq, query, self.r)
+
+            dist_profile[i] = dist
+            if dist < bsf:
+                bsf = dist
+
+        # Отбираем topK без тривиальных совпадений
+        topK_results = topK_match(dist_profile, excl_zone, self.topK)
+
+        bestmatch['indices'] = topK_results['indices']
+        bestmatch['distances'] = topK_results['distances']
 
         return bestmatch
 
@@ -197,9 +216,7 @@ class UCR_DTW(BestMatchFinder):
         lb_Kim: LB_Kim lower bound
         """
 
-        lb_Kim = 0
-        
-        # INSERT YOUR CODE
+        lb_Kim = (subs1[0] - subs2[0]) ** 2 + (subs1[-1] - subs2[-1]) ** 2
 
         return lb_Kim
 
@@ -219,9 +236,23 @@ class UCR_DTW(BestMatchFinder):
         lb_Keogh: LB_Keogh lower bound
         """
 
-        lb_Keogh = 0
+        m = len(subs1)
 
-        # INSERT YOUR CODE
+        window = max(1, int(np.ceil(r * m)))
+
+        lb_Keogh = 0.0
+
+        for i in range(m):
+            start = max(0, i - window)
+            stop = min(m, i + window + 1)
+
+            lower = np.min(subs1[start:stop])
+            upper = np.max(subs1[start:stop])
+
+            if subs2[i] > upper:
+                lb_Keogh += (subs2[i] - upper) ** 2
+            elif subs2[i] < lower:
+                lb_Keogh += (subs2[i] - lower) ** 2
 
         return lb_Keogh
 
@@ -269,12 +300,62 @@ class UCR_DTW(BestMatchFinder):
 
         dist_profile = np.ones((N,))*np.inf
         bsf = np.inf
-        
+
         bestmatch = {
-            'index' : [],
-            'distance' : []
+            'indices': [],
+            'distances': []
         }
 
-        # INSERT YOUR CODE
+        # Нормализация запроса
+        if self.is_normalize:
+            query = z_normalize(query)
+
+        for i in range(N):
+            subseq = ts_data[i]
+
+            if self.is_normalize:
+                subseq = z_normalize(subseq)
+
+            # 1. LB_Kim
+            lb_kim = self._LB_Kim(query, subseq)
+
+            if lb_kim > bsf:
+                self.lb_Kim_num += 1
+                continue
+
+            # 2. LB_Keogh EQ
+            lb_keogh_qc = self._LB_Keogh(query, subseq, self.r)
+
+            if lb_keogh_qc > bsf:
+                self.lb_KeoghQC_num += 1
+                continue
+
+            # 3. LB_Keogh EC
+            lb_keogh_cq = self._LB_Keogh(subseq, query, self.r)
+
+            if lb_keogh_cq > bsf:
+                self.lb_KeoghCQ_num += 1
+                continue
+
+            # Если кандидат прошел все нижние границы,
+            # вычисляем настоящее DTW-расстояние
+            dist = DTW_distance(query, subseq, self.r)
+
+            dist_profile[i] = dist
+
+            if dist < bsf:
+                bsf = dist
+
+            self.not_pruned_num += 1
+
+        # Выбираем topK совпадений
+        topK_results = topK_match(
+            dist_profile,
+            excl_zone,
+            self.topK
+        )
+
+        bestmatch['indices'] = topK_results['indices']
+        bestmatch['distances'] = topK_results['distances']
 
         return bestmatch
