@@ -11,7 +11,7 @@ import plotly.express as px
 plotly.offline.init_notebook_mode(connected=True)
 
 
-def plot_ts(ts: np.ndarrray, title: str = 'Input Time Series') -> None:
+def plot_ts(ts: np.ndarray, title: str = 'Input Time Series') -> None:
     """
     Plot the time series
 
@@ -236,4 +236,47 @@ def plot_segmentation(mp: dict, threshold: float) -> None:
                       plot_bgcolor="rgba(0,0,0,0)",
                       paper_bgcolor='rgba(0,0,0,0)', height=700)
 
+    fig.show(renderer="colab")
+
+def plot_segmentation_with_boundaries(mp, threshold, change_points=None,
+                                      predicted=None, labels_binary=None):
+    n = len(mp['data']['ts1'])
+    mp_values = np.asarray(mp['mp'], dtype=np.float64)
+
+    fig = make_subplots(rows=3, cols=1,
+                        shared_xaxes=True,
+                        vertical_spacing=0.08,
+                        subplot_titles=("Time series + boundaries",
+                                        "Matrix Profile + threshold",
+                                        "True vs predicted labels"))
+
+    # 1. Исходный ряд + вертикальные линии границ
+    fig.add_trace(go.Scatter(x=np.arange(n), y=mp['data']['ts1'],
+                             line=dict(color='#636EFA'), name="Time Series",
+                             showlegend=False), row=1, col=1)
+
+    if change_points is not None:
+        for cp in change_points:
+            fig.add_vline(x=cp, line_width=2, line_dash="dash",
+                          line_color="red", row=1, col=1)
+
+    # 2. MP + порог
+    fig.add_trace(go.Scatter(x=np.arange(len(mp_values)), y=mp_values,
+                             line=dict(color='#636EFA', width=2),
+                             name="Matrix Profile", showlegend=False), row=2, col=1)
+    fig.add_hline(y=threshold, line_width=3, line_dash="dash",
+                  line_color="red", row=2, col=1)
+
+    # 3. Истинные и предсказанные метки
+    if labels_binary is not None:
+        fig.add_trace(go.Scatter(x=np.arange(len(labels_binary)), y=labels_binary,
+                                 line=dict(color='green', width=2),
+                                 name="True labels", showlegend=True), row=3, col=1)
+    if predicted is not None:
+        fig.add_trace(go.Scatter(x=np.arange(len(predicted)), y=predicted,
+                                 line=dict(color='red', width=2, dash='dot'),
+                                 name="Predicted labels", showlegend=True), row=3, col=1)
+
+    fig.update_layout(height=1000, plot_bgcolor="rgba(0,0,0,0)",
+                      paper_bgcolor='rgba(0,0,0,0)')
     fig.show(renderer="colab")

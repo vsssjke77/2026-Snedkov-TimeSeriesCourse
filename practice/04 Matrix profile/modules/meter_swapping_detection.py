@@ -11,7 +11,7 @@ plotly.offline.init_notebook_mode(connected=True)
 from modules.mp import *
 
 
-def heads_tails(consumptions: dict, cutoff, house_idx: list) -> dict, dict:
+def heads_tails(consumptions: dict, cutoff, house_idx: list) -> dict:
     """
     Split time series into two parts: Head and Tail
 
@@ -54,9 +54,43 @@ def meter_swapping_detection(heads: dict, tails: dict, house_idx: dict, m: int) 
 
     eps = 0.001
 
-    min_score = {}
+    min_score = {'i': None, 'j': None, 'mp_j': None, 'score': np.inf}
 
-    # INSERT YOUR CODE
+    n_houses = len(house_idx)
+
+    # 1. Считаем "диагональные" скоры: min MP между Head_i и Tail_i (без свопа)
+    #    Это знаменатель формулы swap_score
+    diag_min = {}
+    for i in house_idx:
+        head_i = heads[f'H_{i}'].to_numpy(dtype=np.float64).flatten()
+        tail_i = tails[f'T_{i}'].to_numpy(dtype=np.float64).flatten()
+
+        # Матричный профиль между двумя разными рядами (AB-join)
+        mp_ii = compute_mp(head_i, m, ts2=tail_i)
+        diag_min[i] = np.min(mp_ii['mp'])
+
+    # 2. Перебираем все пары (i, j), i != j, и считаем swap_score
+    for i in house_idx:
+        head_i = heads[f'H_{i}'].to_numpy(dtype=np.float64).flatten()
+
+        for j in house_idx:
+            if i == j:
+                continue
+
+            tail_j = tails[f'T_{j}'].to_numpy(dtype=np.float64).flatten()
+
+            # MP между Head_i и Tail_j
+            mp_ij = compute_mp(head_i, m, ts2=tail_j)
+            min_ij = np.min(mp_ij['mp'])
+
+            # swap_score
+            score = min_ij / (diag_min[i] + eps)
+
+            if score < min_score['score']:
+                min_score['score'] = score
+                min_score['i'] = i
+                min_score['j'] = j
+                min_score['mp_j'] = mp_ij
     
     return min_score
 
